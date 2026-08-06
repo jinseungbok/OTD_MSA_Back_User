@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.otd.otd_challenge.application.challenge.ChallengeSettlementMapper">
+    <select id="findByUserId">
+        SELECT distinct cp.user_id
+        FROM challenge_progress cp
+        JOIN challenge_definition cd
+        ON cp.cd_id = cd.cd_id AND cd.cd_type = #{type}
+        WHERE cp.start_date >= #{startDate}
+        AND cp.end_date = #{endDate}
+    </select>
+
+    <select id="findProgressChallengeByUserId">
+        <if test="type == 'competition' or type == 'weekly'">
+        WITH ranked AS (
+        SELECT cpp.user_id, cpp.cd_id,
+            RANK() OVER (PARTITION BY cpp.cd_id ORDER BY cpp.total_record DESC) AS rank
+        FROM challenge_progress cpp
+        JOIN challenge_definition cdd ON cpp.cd_id = cdd.cd_id
+        WHERE cdd.cd_type = #{type}
+        AND cpp.start_date >= #{startDate}
+        AND cpp.end_date = #{endDate}
+        AND cpp.is_success = TRUE
+        )
+        </if>
+        SELECT cp.user_id,
+            cd.cd_id,
+            cp.cp_id,
+            cd.cd_name AS name,
+            cd.cd_image AS image,
+            cp.total_record,
+            cd.cd_reward AS reward,
+            cd.xp AS xp,
+            cd.cd_type AS `type`
+            <if test="type == 'competition' || type == 'weekly'">
+            , r.rank
+            </if>
+        FROM challenge_progress cp
+        JOIN challenge_definition cd
+        ON cp.cd_id = cd.cd_id AND cd.cd_type = #{type}
+        <if test="type == 'competition' || type == 'weekly'">
+        LEFT JOIN ranked r
+        ON r.user_id = cp.user_id AND r.cd_id = cd.cd_id
+        </if>
+        WHERE cp.start_date >= #{startDate}
+        AND cp.end_date = #{endDate}
+        AND cp.user_id = #{userId}
+        AND cp.is_success = TRUE;
+    </select>
+
+    <select id="findSettlementLogByUserIdAndSettlementDate">
+        SELECT cs.cs_id,
+        cs.total_point,
+        cd.cd_image AS image,
+        cd.cd_name AS name,
+        cd.cd_reward AS reward,
+        cd.xp AS xp,
+        ch.point AS extra_reward
+        FROM challenge_settlement_log cs
+        JOIN challenge_definition cd
+        ON cs.cd_id = cd.cd_id
+        LEFT JOIN challenge_point_history ch
+        ON ch.user_id = cs.user_id
+        AND DATE(ch.created_at) = DATE(cs.created_at)
+        <if test="type == 'monthly'">
+            AND (ch.reason = CONCAT('rank_reward_', cd.cd_name)
+            OR ch.reason = CONCAT('attendance_reward_', cd.cd_name))
+        </if>
+        <if test="type == 'weekly'">
+            AND ch.reason = CONCAT('rank_reward_', cd.cd_name)
+        </if>
+        <where>
+            cs.user_id = #{userId}
+            AND DATE(cs.created_at) = #{settlementDate}
+            <if test="type == 'monthly'">
+                AND (cs.`type` LIKE 'competition%' OR cs.`type` LIKE 'personal%')
+            </if>
+            <if test="type == 'weekly'">
+                AND cs.`type` LIKE 'weekly%'
+            </if>
+        </where>
+    </select>
+</mapper>

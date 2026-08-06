@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.otd.otd_pointshop.application.point.PointshopMapper">
+
+    <!-- PointImageRes 매핑 -->
+    <resultMap id="pointImageResMap"
+               type="com.otd.otd_pointshop.application.point.model.PointImageRes">
+        <id property="imageId" column="image_id" />
+        <result property="imageUrl" column="image_url" />
+        <result property="imageType" column="image_type" />
+        <result property="altText" column="alt_text" />
+    </resultMap>
+
+    <!-- PointGetRes 매핑 -->
+    <resultMap id="pointGetResMap"
+               type="com.otd.otd_pointshop.application.point.model.PointGetRes">
+        <id property="pointId" column="point_id" />
+        <result property="pointScore" column="point_score" />
+        <result property="pointItemName" column="point_item_name" />
+        <result property="pointItemContent" column="point_item_content" />
+        <result property="category" column="category" />
+        <result property="createdAt" column="created_at" />
+        <collection property="images"
+                    ofType="com.otd.otd_pointshop.application.point.model.PointImageRes"
+                    resultMap="pointImageResMap" />
+    </resultMap>
+
+
+    <!-- 전체 포인트 아이템 목록 (카테고리 필터링 포함) -->
+    <select id="findAllPoints" resultMap="pointGetResMap">
+        SELECT
+        p.point_id,
+        p.point_item_name,
+        p.point_item_content,
+        p.point_score,
+        p.created_at,
+        c.point_category_id,
+        c.category_name,
+        i.image_id,
+        i.image_url,
+        i.image_type,
+        i.alt_text
+        FROM point p
+        LEFT JOIN point_image i ON p.point_id = i.point_id
+        LEFT JOIN point_category c ON p.point_category_id = c.point_category_id
+        <where>
+            <if test="pointCategoryId != null">
+                p.point_category_id = #{pointCategoryId}
+            </if>
+        </where>
+        ORDER BY p.created_at DESC
+    </select>
+
+    <!-- 단일 아이템 조회 -->
+    <select id="findPointById" resultMap="pointGetResMap">
+        SELECT
+        p.point_id,
+        p.point_score,
+        p.point_item_name,
+        p.point_item_content,
+        p.category,
+        p.created_at,
+        i.image_id,
+        i.image_url,
+        i.image_type,
+        i.alt_text
+        FROM point p
+        LEFT JOIN point_image i ON p.point_id = i.point_id
+        WHERE p.point_id = #{pointId}
+    </select>
+
+
+    <!-- 포인트 아이템 등록 -->
+    <insert id="savePoint" useGeneratedKeys="true" keyProperty="pointId">
+        INSERT INTO point
+        (point_score, point_item_name, point_item_content, category, created_at, updated_at)
+        VALUES
+        (#{pointScore}, #{pointItemName}, #{pointItemContent}, #{category}, NOW(), NOW())
+    </insert>
+
+
+    <!-- 포인트 아이템 수정 -->
+    <update id="updatePoint">
+        UPDATE point
+        SET
+        point_score = #{pointScore},
+        point_item_name = #{pointItemName},
+        point_item_content = #{pointItemContent},
+        category = #{category},
+        updated_at = NOW()
+        WHERE point_id = #{pointId}
+    </update>
+
+
+    <!-- 포인트 아이템 삭제 -->
+    <delete id="deletePoint">
+        DELETE FROM point
+        WHERE point_id = #{pointId}
+    </delete>
+
+
+    <!-- 키워드 검색 (카테고리 병행 검색 가능) -->
+    <select id="findPointsByKeyword" resultMap="pointGetResMap">
+        SELECT
+        p.point_id,
+        p.point_score,
+        p.point_item_name,
+        p.point_item_content,
+        p.category,
+        p.created_at,
+        i.image_id,
+        i.image_url,
+        i.image_type,
+        i.alt_text
+        FROM point p
+        LEFT JOIN point_image i ON p.point_id = i.point_id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (p.point_item_name LIKE CONCAT('%', #{keyword}, '%')
+                OR p.point_item_content LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="category != null and category != ''">
+                AND p.category = #{category}
+            </if>
+        </where>
+        ORDER BY p.created_at DESC
+    </select>
+
+</mapper>

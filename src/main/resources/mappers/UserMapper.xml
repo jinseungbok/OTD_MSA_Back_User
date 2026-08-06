@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.otd.otd_user.application.user.UserMapper">
+    <select id="findProfileByUserId">
+        SELECT
+        user_id as userId,
+        pic,
+        created_at as createdAt,
+        uid,
+        nick_name as nickName,
+        email,
+        phone,
+        birth_date as birthDate,
+        gender,
+        point,
+        name
+        FROM user
+        WHERE user_id = #{signedUserId}
+    </select>
+    <select id="countByUid" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM user WHERE uid = #{uid}
+    </select>
+
+    <select id="countByNickname" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM user WHERE nick_name = #{nickname}
+    </select>
+    <select id="findAllMissionCompleteByUserId">
+        SELECT cm_id, user_id, cd_id, success_date
+        FROM challenge_mission
+        WHERE user_id = #{userId}
+        ORDER BY success_date DESC
+    </select>
+</mapper>

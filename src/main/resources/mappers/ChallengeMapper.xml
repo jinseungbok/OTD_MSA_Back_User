@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.otd.otd_challenge.application.challenge.ChallengeMapper">
+    <select id="findAll">
+        SELECT cd_id AS id, cd_goal AS goal, cd_image AS image,
+               cd_name AS name, cd_type AS type, cd_reward AS reward, xp, cd_unit AS unit,
+               note
+        FROM challenge_definition
+    </select>
+    <select id="findAllMonthlyFromUserId">
+        SELECT cp.user_id AS userId, cp.cp_id AS cpId, cp.cd_id AS cdId,
+               cp.start_date, cp.end_date, cp.total_record, cd.cd_image AS image,
+               cd.cd_type AS type, cd.cd_name AS `name`,
+               cd.cd_reward AS reward, cd.cd_unit AS unit
+        FROM challenge_progress cp
+        INNER JOIN challenge_definition cd
+        ON cd.cd_id = cp.cd_id
+        WHERE cp.user_id = #{userId}
+        AND Year(cp.start_date) = #{year}
+        AND Month(cp.start_date) = #{month}
+    </select>
+    <select id="findAllWeeklyFromUserId">
+        SELECT cp.user_id AS userId, cp.cp_id AS cpId, cp.cd_id AS cdId,
+        cp.start_date, cp.end_date, cp.total_record, cd.cd_image AS image,
+        cd.cd_type AS type, cd.cd_name AS `name`,
+        cd.cd_reward AS reward, cd.cd_unit AS unit
+        FROM challenge_progress cp
+        INNER JOIN challenge_definition cd
+        ON cd.cd_id = cp.cd_id
+        WHERE cp.user_id = #{userId}
+        AND cp.start_date > #{date}
+        AND cd.cd_type = "weekly"
+    </select>
+    <select id="findByType">
+        SELECT cd.cd_id AS id, cd.cd_goal AS goal, cd.cd_image AS image,
+        cd.cd_name AS name, cd.cd_type AS type, cd.cd_reward AS reward, cd.cd_unit AS unit, tier AS tierCode
+        FROM challenge_definition cd
+        WHERE cd.cd_id NOT IN(SELECT cp.cd_id FROM challenge_progress cp WHERE cp.user_id = #{userId}
+                                                                        <if test="type == 'competition' || type == 'personal'">
+                                                                            AND YEAR(cp.start_date) = #{year}
+                                                                            AND MONTH(cp.start_date) = #{month}
+                                                                        </if>
+                                                                        <if test="type == 'weekly'">
+                                                                            AND cp.start_date > #{date}
+                                                                        </if>)
+        AND cd.cd_type = #{type}
+    </select>
+    <select id="findByTypeForCompetition">
+        SELECT cd_id AS id, cd_goal AS goal, cd_image AS image,
+        cd_name AS name, cd_type AS type, cd_reward AS reward, cd_unit AS unit, tier AS tierCode
+        FROM challenge_definition
+        WHERE cd_name NOT IN(SELECT cd.cd_name
+                            FROM challenge_definition cd
+                            INNER JOIN challenge_progress cp
+                            ON cd.cd_id = cp.cd_id AND cd.cd_type = #{type}
+                            WHERE cp.user_id = #{userId}
+                            <if test="type == 'competition' || type == 'personal'">
+                                AND YEAR(cp.start_date) = #{year}
+                                AND MONTH(cp.start_date) = #{month}
+                            </if>
+                            <if test="type == 'weekly'">
+                                AND cp.start_date > #{date}
+                            </if>)
+        AND cd_type = #{type};
+    </select>
+    <select id="findProgressByUserIdAndCdId">
+        WITH ranking AS (
+        SELECT
+        cp.cp_id, cp.user_id, cp.total_record, cp.is_success,
+        RANK() OVER (ORDER BY cp.total_record DESC) AS my_rank
+        FROM challenge_progress cp
+        WHERE cp.cd_id = #{cdId}
+        <if test="type == 'competition' || type == 'personal'">
+            AND YEAR(cp.start_date) = #{year}
+            AND MONTH(cp.start_date) = #{month}
+        </if>
+        <if test="type == 'weekly'">
+            AND cp.start_date > #{date}
+        </if>)
+        SELECT
+        r.cp_id, cd.cd_id AS cdId, cd.cd_name AS `name`, r.user_id,cd.cd_goal AS goal,
+        r.total_record, cd.cd_reward AS reward, r.my_rank, cd.cd_unit AS unit,
+        r.is_success,
+        (SELECT COUNT(*) FROM ranking) AS total_users
+        FROM ranking r
+        INNER JOIN challenge_definition cd
+        ON cd.cd_id = #{cdId}
+        WHERE r.user_id = #{userId}
+    </select>
+    <select id="findTop5Ranking">
+        SELECT u.user_id, u.nick_name, u.pic, cp.total_record, u.name,
+               RANK() OVER(ORDER BY cp.total_record DESC) AS `rank`
+        FROM user u
+        INNER JOIN challenge_progress cp
+        ON u.user_id = cp.user_id
+        WHERE cp.cd_id = #{cdId}
+        <if test="type == 'competition' || type == 'personal'">
+            AND YEAR(cp.start_date) = #{year}
+            AND MONTH(cp.start_date) = #{month}
+        </if>
+        <if test="type == 'weekly'">
+            AND cp.start_date > #{date}
+        </if>
+        LIMIT 5;
+    </select>
+    <select id="findAroundMyRank">
+        WITH ranking AS (
+        SELECT
+        u.nick_name, u.pic, cp.cp_id, cp.user_id, cp.total_record, u.name,
+        RANK() OVER (ORDER BY cp.total_record DESC) AS rank
+        FROM challenge_progress cp
+        INNER JOIN user u ON u.user_id = cp.user_id
+        WHERE cp.cd_id = #{cdId}
+        <if test="type == 'competition' || type == 'personal'">
+        AND YEAR(cp.start_date) = #{year}
+        AND MONTH(cp.start_date) = #{month}
+        </if>
+        <if test="type == 'weekly'">
+        AND cp.start_date > #{date}
+        </if>)
+        SELECT
+        r.user_id, r.nick_name, r.pic, r.total_record, r.rank
+        FROM ranking r
+        WHERE r.rank BETWEEN
+        ((SELECT rank FROM ranking WHERE user_id = #{userId}) - 2)
+        AND
+        ((SELECT rank FROM ranking WHERE user_id = #{userId}) + 4)
+        ORDER BY r.rank
+        LIMIT 5
+    </select>
+    <select id="findDayByUserIdAndCdId">
+        SELECT cd.cd_name AS name, cd.cd_unit AS unit, cp.cp_id,
+               cp.user_id, cp.cd_id, cd.cd_goal  AS goal,
+               DAY(cr.rec_date) AS date, cp.start_date, cp.end_date,
+               cd.cd_reward AS reward, cp.is_success
+        FROM challenge_progress cp
+        LEFT JOIN challenge_record cr
+        ON cr.cp_id = cp.cp_id
+        AND cr.rec_date BETWEEN cp.start_date AND cp.end_date
+        INNER JOIN challenge_definition cd
+        ON cd.cd_id = cp.cd_id
+        WHERE cp.user_id = #{userId}
+        AND cp.cd_id = #{cdId}
+        AND Year(cp.start_date) = #{year}
+        AND Month(cp.start_date) = #{month};
+    </select>
+    <select id="findSuccessChallenge">
+        SELECT SUM(is_success = TRUE) AS success
+        FROM challenge_progress
+        WHERE user_id = #{userId};
+    </select>
+    <insert id="saveMissionRecordByUserIdAndCpId">
+        INSERT INTO challenge_mission
+        SET
+        user_id = #{userId},
+        cd_id = #{cdId},
+        success_date = CURRENT_DATE
+    </insert>
+    <select id="findByUserIdAndMissionComplete">
+        SELECT user_id, cd_id, success_date
+        FROM challenge_mission
+        WHERE user_id = #{userId}
+        AND success_date = CURRENT_DATE;
+    </select>
+    <select id="findAllMyChallenge">
+        SELECT cd.cd_id, cd.cd_goal AS goal, cp.total_record, cd.cd_name AS `name`
+             , cd.cd_unit AS unit, cd.cd_type AS type
+        FROM challenge_definition cd
+        INNER JOIN challenge_progress cp
+        ON cp.cd_id = cd.cd_id
+        WHERE cp.user_id = #{userId}
+        AND ((cd.cd_type = 'weekly' AND cp.start_date >= #{date})
+        OR (cd.cd_type = 'competition' AND YEAR(cp.start_date) = #{year} AND MONTH(cp.start_date) = #{month})
+        OR (cd.cd_type = 'personal' AND YEAR(cp.start_date) = #{year} AND MONTH(cp.start_date) = #{month}))
+        ORDER BY
+        CASE cd.cd_type
+        WHEN 'competition' THEN 1
+        WHEN 'personal' THEN 2
+        WHEN 'weekly' THEN 3
+        ELSE 4 END;
+    </select>
+</mapper>

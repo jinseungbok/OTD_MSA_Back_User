@@ -1,0 +1,55 @@
+constants:
+  file:
+    upload-directory: /home/download/msa
+  jwt:
+    refresh-token-cookie-path: /otd-api/api/OTD/user/reissue
+
+  feign-client:
+    life:
+      name: otd-life
+      url: "http://otd-life:8082"
+  oauth2:
+    base-uri: /oauth2/authorization #FE 소셜로그인 요청할 때 사용할 주소값
+    # 플랫폼과 통신을 3번 정도 하는데 각 통신들이 하나의 작업을 위한 트랜잭션이라는 것을
+    # 연결시키기 위해 쿠키를 사용한다.
+    authorization-request-cookie-name: oauth2_auth_request
+    redirect-uri-param-cookie-name: redirect_uri
+    redirection-baseUri: /*/oauth2/code/*
+    cookie-expiry-seconds: 180
+    authorized-redirect-uris:
+      - https://greenart.n-e.kr/otd/fe/redirect
+      - http://localhost:5175/otd/fe/redirect
+      - http://localhost:5175/otd/redirect
+      - http://112.222.157.157:5175/otd/fe/redirect
+
+
+server:
+  port: 8082
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+
+spring:
+  cloud:
+    kubernetes:
+      loadbalancer:
+        enabled: true
+      discovery:
+        enabled: true
+      reload:
+        enabled: true
+        strategy: refresh
+  datasource:
+    url: jdbc:log4jdbc:mariadb://127.0.0.1:3306/2025_2st_Project_BE_MSA
+    username: root
+    password: 921218
+  jpa:
+    hibernate:
+      ddl-auto: update
